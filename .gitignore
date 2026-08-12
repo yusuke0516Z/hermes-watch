@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+
+# ローカル実行のログ（Actions側は freshness.jsonl のみ追跡する）
+logs/*
+!logs/freshness.jsonl
+
+# state はGitHub Actions側の実行状態を追跡する（重複通知防止の要）
+# ローカルlaunchdとActionsは別々のstateを持つ（それぞれ独立に重複防止する）

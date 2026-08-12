@@ -1,0 +1,65 @@
+# Hermès 在庫監視（24時間稼働の主基盤）
+#
+# 2026-08-12 実験で GitHub Actions の runner IP からカテゴリページを取得できることを確認済み
+# （3回連続で listed:16 / cache:HIT / ブロックなし）。Macのスリープに依存しない24h監視はここが担う。
+#
+# cron間隔の考え方:
+#   カテゴリページは Cloudflare CDN キャッシュ配信のため、叩く間隔を詰めても
+#   キャッシュが更新されるまで新しい在庫は見えない。よって「補充が集中する時間帯を厚く張る」方針。
+#   補充はJST 0〜8時に集中（コミュニティ知見）→ UTC 15〜23時 を5分間隔、他は15分間隔。
+#   ※GitHub側の混雑で cron は遅延することがある（数分〜十数分）。保証はされない。
+name: hermes-monitor
+
+on:
+  schedule:
+    # JST 0:00-8:55（UTC 15:00-23:55）: 補充集中帯を5分間隔
+    - cron: "*/5 15-23 * * *"
+    # JST 9:00-23:55（UTC 0:00-14:55）: 15分間隔
+    - cron: "*/15 0-14 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "通知を送らず動作確認だけする"
+        type: boolean
+        default: false
+
+concurrency:
+  group: hermes-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run monitor
+        env:
+          HERMES_SMTP_PASSWORD: ${{ secrets.HERMES_SMTP_PASSWORD }}
+          LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            python3 hermes_monitor.py --once --no-jitter --dry-run
+          else
+            python3 hermes_monitor.py --once --no-jitter
+          fi
+
+      - name: Persist state and freshness data
+        if: always()
+        run: |
+          git config user.name "hermes-monitor[bot]"
+          git config user.email "hermes-monitor@users.noreply.github.com"
+          git add -f state/products.json logs/freshness.jsonl 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no state change"
+          else
+            git commit -m "state: update [skip ci]"
+            # 他のrunと衝突したらリモートを取り込んでから再push
+            git pull --rebase --autostash origin main || true
+            git push origin main
+          fi

@@ -1,0 +1,38 @@
+{
+  "watch_models": [
+    { "model": "Picotin",   "keywords": ["ピコタン", "picotin"] },
+    { "model": "Constance", "keywords": ["コンスタンス", "constance"] },
+    { "model": "Lindy",     "keywords": ["リンディ", "lindy"] }
+  ],
+  "priority_colors": [
+    "Gold", "ゴールド",
+    "Etoupe", "エトゥープ",
+    "Noir", "ノワール",
+    "Craie", "クレ",
+    "Nata", "ナタ",
+    "Gris Meyer", "グリメイヤー", "グリ・メイヤー",
+    "Bleu Nuit", "ブルーニュイ", "ブルー・ニュイ",
+    "Rouge H", "ルージュH", "ルージュ・アッシュ"
+  ],
+  "category_urls": [
+    "https://www.hermes.com/jp/ja/category/leather-goods/bags-and-clutches/womens-bags-and-clutches/"
+  ],
+  "base_url": "https://www.hermes.com/jp/ja",
+  "_privacy_note": "宛先・送信元アドレスはこのファイルに書かない（公開リポジトリのため）。環境変数か .env を使う。",
+  "smtp": {
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "user_env": "HERMES_SMTP_USER",
+    "password_env": "HERMES_SMTP_PASSWORD",
+    "recipient_env": "HERMES_RECIPIENT",
+    "failure_alert_env": "HERMES_FAILURE_ALERT_TO"
+  },
+  "line": {
+    "enabled": false,
+    "token_env": "LINE_CHANNEL_TOKEN",
+    "_note": "LINE Developersでチャネル作成→トークンを.envに設定→enabledをtrueに"
+  },
+  "jitter_seconds": 45,
+  "notify_sold_out": false,
+  "failure_alert_after": 12
+}
