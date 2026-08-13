@@ -28,7 +28,7 @@
     "failure_alert_env": "HERMES_FAILURE_ALERT_TO"
   },
   "line": {
-    "enabled": false,
+    "enabled": true,
     "token_env": "LINE_CHANNEL_TOKEN",
     "_note": "LINE Developersでチャネル作成→トークンを.envに設定→enabledをtrueに"
   },

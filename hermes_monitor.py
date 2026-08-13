@@ -384,7 +384,7 @@ def build_line_messages(cfg: dict, events: list[dict], now_disp: str) -> list[di
             "footer": {"type": "box", "layout": "vertical", "contents": [
                 {"type": "button", "style": "primary", "color": "#F37021",
                  "action": {"type": "uri", "label": "商品ページを開く", "uri": r["url"]}},
-                {"type": "text", "text": f"検知 {now_disp} JST", "size": "xxs",
+                {"type": "text", "text": f"検知 {now_disp}", "size": "xxs",
                  "color": "#AAAAAA", "align": "center", "margin": "sm"},
             ]},
         }
@@ -396,8 +396,6 @@ def build_line_messages(cfg: dict, events: list[dict], now_disp: str) -> list[di
             "altText": f"{star}👜 {r['model']} {label} {r['title']}",
             "contents": bubble,
         })
-    if len(events) > 5:
-        messages[-1] = messages[-1]  # 5件超はメール側で全件確認できる
     return messages
 
 

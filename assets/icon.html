@@ -1,0 +1,27 @@
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:640px; height:640px; display:flex; align-items:center; justify-content:center;
+         background:#F37021; font-family:"Hiragino Sans","Helvetica Neue",sans-serif; }
+  .card { width:640px; height:640px; position:relative; display:flex; flex-direction:column;
+          align-items:center; justify-content:center; gap:26px;
+          background:radial-gradient(circle at 50% 34%, #F8853B 0%, #F37021 52%, #D95E14 100%); }
+  .ring { position:absolute; inset:34px; border:3px solid rgba(255,255,255,.34); border-radius:50%; }
+  svg { display:block; }
+  .word { font-size:60px; letter-spacing:.14em; font-weight:700; color:#fff; line-height:1; }
+  .sub { font-size:23px; letter-spacing:.42em; color:rgba(255,255,255,.9); font-weight:600;
+         text-indent:.42em; }
+</style>
+<div class="card">
+  <div class="ring"></div>
+  <!-- 汎用のバケツ型バッグ（ハンドル2本）。ブランドロゴは使用しない -->
+  <svg width="224" height="200" viewBox="0 0 224 200" fill="none">
+    <path d="M74 86V60c0-15 34-15 34 0v26" stroke="#fff" stroke-width="11" stroke-linecap="round"/>
+    <path d="M116 86V60c0-15 34-15 34 0v26" stroke="#fff" stroke-width="11" stroke-linecap="round"/>
+    <path d="M34 86h156l-13 92a12 12 0 01-12 10H59a12 12 0 01-12-10z" fill="#fff"/>
+    <rect x="101" y="112" width="22" height="34" rx="11" fill="#D95E14"/>
+  </svg>
+  <div style="text-align:center">
+    <div class="word">WATCH</div>
+    <div class="sub">RESTOCK ALERT</div>
+  </div>
+</div>
