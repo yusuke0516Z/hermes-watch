@@ -1,5 +1,6 @@
 {
  "products": {},
  "failure_streak": 0,
- "failure_alerted": false
+ "failure_alerted": false,
+ "initialized": true
 }

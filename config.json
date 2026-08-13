@@ -1,18 +1,47 @@
 {
   "watch_models": [
-    { "model": "Picotin",   "keywords": ["ピコタン", "picotin"] },
-    { "model": "Constance", "keywords": ["コンスタンス", "constance"] },
-    { "model": "Lindy",     "keywords": ["リンディ", "lindy"] }
+    {
+      "model": "Picotin",
+      "keywords": [
+        "ピコタン",
+        "picotin"
+      ]
+    },
+    {
+      "model": "Constance",
+      "keywords": [
+        "コンスタンス",
+        "constance"
+      ]
+    },
+    {
+      "model": "Lindy",
+      "keywords": [
+        "リンディ",
+        "lindy"
+      ]
+    }
   ],
   "priority_colors": [
-    "Gold", "ゴールド",
-    "Etoupe", "エトゥープ",
-    "Noir", "ノワール",
-    "Craie", "クレ",
-    "Nata", "ナタ",
-    "Gris Meyer", "グリメイヤー", "グリ・メイヤー",
-    "Bleu Nuit", "ブルーニュイ", "ブルー・ニュイ",
-    "Rouge H", "ルージュH", "ルージュ・アッシュ"
+    "Gold",
+    "ゴールド",
+    "Etoupe",
+    "エトゥープ",
+    "Noir",
+    "ノワール",
+    "Craie",
+    "クレ",
+    "Nata",
+    "ナタ",
+    "Gris Meyer",
+    "グリメイヤー",
+    "グリ・メイヤー",
+    "Bleu Nuit",
+    "ブルーニュイ",
+    "ブルー・ニュイ",
+    "Rouge H",
+    "ルージュH",
+    "ルージュ・アッシュ"
   ],
   "category_urls": [
     "https://www.hermes.com/jp/ja/category/leather-goods/bags-and-clutches/womens-bags-and-clutches/"
@@ -20,6 +49,8 @@
   "base_url": "https://www.hermes.com/jp/ja",
   "_privacy_note": "宛先・送信元アドレスはこのファイルに書かない（公開リポジトリのため）。環境変数か .env を使う。",
   "smtp": {
+    "_note": "メールは任意。LINEが主経路。enabled=false かパスワード未設定なら黙ってスキップする",
+    "enabled": false,
     "host": "smtp.gmail.com",
     "port": 587,
     "user_env": "HERMES_SMTP_USER",

@@ -30,6 +30,7 @@ import re
 import smtplib
 import sys
 import time
+import urllib.parse
 import urllib.request
 import zlib
 from datetime import datetime, timedelta, timezone
@@ -186,6 +187,16 @@ def to_record(cfg: dict, item: dict, model: str, now: str) -> dict:
         url = "https://www.hermes.com" + path
     else:
         url = base + path
+    # Hermèsの商品URLは日本語（例 /product/バッグ-《ピコタン》-H0000/）を含む。
+    # 非ASCIIのままだとLINEが "Invalid action URI" で400を返し通知が届かないため、
+    # パス部分をパーセントエンコードする（ASCIIのみのURLは変化しない）。
+    parts = urllib.parse.urlsplit(url)
+    url = urllib.parse.urlunsplit((
+        parts.scheme, parts.netloc,
+        urllib.parse.quote(parts.path, safe="/-_.~"),
+        urllib.parse.quote(parts.query, safe="=&"),
+        parts.fragment,
+    ))
     return {
         "sku": item["sku"],
         "model": model,
@@ -418,6 +429,18 @@ def send_line(cfg: dict, messages: list[dict]) -> None:
             raise RuntimeError(f"LINE broadcast failed: HTTP {resp.status}")
 
 
+def send_line_text(cfg: dict, text: str) -> None:
+    """障害アラート等のプレーンテキストをLINEに流す。"""
+    send_line(cfg, [{"type": "text", "text": text}])
+
+
+def email_enabled(cfg: dict) -> bool:
+    """メールは任意。パスワードが無ければ黙って使わない（LINEが主経路のため）。"""
+    if not cfg.get("smtp", {}).get("enabled", True):
+        return False
+    return bool(read_secret(cfg["smtp"]["password_env"]))
+
+
 # ----------------------------------------------------------------------- main
 
 def run_once(cfg: dict, dry_run: bool) -> None:
@@ -446,17 +469,34 @@ def run_once(cfg: dict, dry_run: bool) -> None:
         limit = cfg.get("failure_alert_after", 12)
         if state["failure_streak"] >= limit and not state.get("failure_alerted"):
             if not dry_run:
+                # LINEを主経路にする。メールだけに頼るとメール未設定時に
+                # 「壊れたまま誰も気づかない」状態になるため。
+                alerted = False
                 try:
-                    send_email(
+                    send_line_text(
                         cfg,
-                        "⚠️ Hermès Watch 停止中の可能性",
-                        f"<p>{state['failure_streak']}回連続で取得に失敗しています。"
-                        f"ブロックまたはサイト構造変更の可能性。<br>最終エラー: {e}</p>",
-                        to_addr=read_secret(cfg["smtp"]["failure_alert_env"]) or None,
+                        f"⚠️ Hermès Watch が停止している可能性があります\n\n"
+                        f"{state['failure_streak']}回連続で在庫の取得に失敗しました。"
+                        f"ブロックまたはサイト構造の変更が疑われます。\n\n"
+                        f"最終エラー: {e}",
                     )
-                    state["failure_alerted"] = True
-                except Exception as me:
-                    log(f"failure alert mail failed: {me}")
+                    alerted = cfg.get("line", {}).get("enabled", False)
+                except Exception as le:
+                    log(f"failure alert LINE failed: {le}")
+                if email_enabled(cfg):
+                    try:
+                        send_email(
+                            cfg,
+                            "⚠️ Hermès Watch 停止中の可能性",
+                            f"<p>{state['failure_streak']}回連続で取得に失敗しています。"
+                            f"ブロックまたはサイト構造変更の可能性。<br>最終エラー: {e}</p>",
+                            to_addr=read_secret(cfg["smtp"]["failure_alert_env"]) or None,
+                        )
+                        alerted = True
+                    except Exception as me:
+                        log(f"failure alert mail failed: {me}")
+                # 通知できなかった場合はフラグを立てない＝次回も再通知を試みる
+                state["failure_alerted"] = alerted
         save_state(state)
         return
 
@@ -465,7 +505,11 @@ def run_once(cfg: dict, dry_run: bool) -> None:
     state["failure_streak"] = 0
     state["failure_alerted"] = False
 
-    first_run = not state["products"]
+    # 「初回か」は監視対象の在庫有無ではなく、一度でも取得に成功したかで判定する。
+    # state["products"] を基準にすると、監視対象が品切れの間ずっと初回扱いになり、
+    # 待ち望んでいた最初の再入荷を握り潰してしまう（2026-08-13 に実測で発覚）。
+    first_run = not state.get("initialized") and not state["products"]
+    state["initialized"] = True
     events = diff(cfg, state, current, now)
 
     log(f"listed:{total_listed} matched:{len(current)} events:{len(events)} "
@@ -488,14 +532,19 @@ def run_once(cfg: dict, dry_run: bool) -> None:
                 json.dumps({"messages": line_msgs}, ensure_ascii=False, indent=1), encoding="utf-8")
             log("[DRY-RUN] -> logs/last_email.html, logs/last_line.json")
         else:
-            # メールとLINEは独立に送る。片方が失敗しても他方は届かせる。
+            # 有効な経路だけを独立に送る。片方が失敗しても他方は届かせる。
+            channels = []
+            if cfg.get("line", {}).get("enabled"):
+                channels.append(("LINE", lambda: send_line(cfg, line_msgs)))
+            if email_enabled(cfg):
+                channels.append(("mail", lambda: send_email(cfg, subject, body)))
+            if not channels:
+                log("通知経路が1つも有効になっていません（LINEかメールを設定してください）")
+
             delivered = False
-            for name, fn in (("LINE", lambda: send_line(cfg, line_msgs)),
-                             ("mail", lambda: send_email(cfg, subject, body))):
+            for name, fn in channels:
                 try:
                     fn()
-                    if name == "LINE" and not cfg.get("line", {}).get("enabled"):
-                        continue  # 未設定時は送信扱いにしない
                     delivered = True
                     log(f"{name} sent: {subject}")
                 except Exception as e:
