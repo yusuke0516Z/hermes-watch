@@ -539,9 +539,24 @@ def run_once(cfg: dict, dry_run: bool) -> None:
             if use_paid:
                 try:
                     html, cache = fetch_via_scrapfly(cfg, url)
+                    if state.pop("scrapfly_alerted", None):
+                        log("scrapfly recovered")
                 except Exception as se:
                     # 有料経路が落ちても監視は止めない。無料のキャッシュ経路に退避する。
+                    # ただし退避したことは1回だけLINEで知らせる（クレジット枯渇に気づけるように）。
                     log(f"scrapfly failed, falling back to direct: {se}")
+                    if not state.get("scrapfly_alerted") and not dry_run:
+                        try:
+                            send_line_text(
+                                cfg,
+                                "⚠️ Hermès Watch: 有料経路(ScrapFly)が失敗し、無料経路に切り替えました。\n"
+                                "クレジット切れの可能性があります。監視は続いていますが、"
+                                "検知が最大1時間ほど遅くなります。\n\n"
+                                f"エラー: {se}",
+                            )
+                            state["scrapfly_alerted"] = True
+                        except Exception as le:
+                            log(f"scrapfly fallback alert failed: {le}")
                     html, cache = fetch_html(url)
             else:
                 html, cache = fetch_html(url)
