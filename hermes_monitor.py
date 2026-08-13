@@ -95,6 +95,59 @@ def save_state(state: dict) -> None:
 
 # ---------------------------------------------------------------- fetch/parse
 
+def _in_paid_window(cfg: dict) -> bool:
+    """有料経路を使う時間帯か。補充が集中する時間だけ課金して費用を抑える。"""
+    sf = cfg.get("scrapfly", {})
+    hours = sf.get("hours_jst")
+    if not hours:
+        return True  # 指定なしなら常時
+    return datetime.now(JST).hour in hours
+
+
+def fetch_via_scrapfly(cfg: dict, url: str) -> tuple[str, dict]:
+    """ScrapFly経由で取得する（有料）。
+
+    ここで重要なのは住宅IPそのものではなく **CDNキャッシュを外せること**。
+    Hermèsのカテゴリページは Cloudflare で最大1時間キャッシュされ、
+    普通に取得する限り誰が叩いても同じ古いコピーが返る。
+    URLにクエリを付けると cf-cache-status: BYPASS になりオリジンまで届くが、
+    素の取得では DataDome に阻まれる。ScrapFlyの asp がそこを突破する。
+    """
+    sf = cfg["scrapfly"]
+    key = read_secret(sf.get("api_key_env", "SCRAPFLY_API_KEY"))
+    if not key:
+        raise RuntimeError(f"ScrapFly APIキー未設定: {sf.get('api_key_env')}")
+
+    target = url
+    if sf.get("cache_bust", True):
+        sep = "&" if "?" in target else "?"
+        target = f"{target}{sep}_={int(time.time())}"
+
+    params = {
+        "key": key,
+        "url": target,
+        "asp": "true" if sf.get("asp", True) else "false",
+        "country": sf.get("country", "jp"),
+        "render_js": "true" if sf.get("render_js", False) else "false",
+    }
+    api = "https://api.scrapfly.io/scrape?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(api, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=sf.get("timeout", 90)) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+
+    result = payload.get("result", {})
+    html = result.get("content", "")
+    headers = {k.lower(): v for k, v in (result.get("response_headers") or {}).items()}
+    cache = {
+        "age": headers.get("age"),
+        "last_modified": headers.get("last-modified"),
+        "cf_cache_status": headers.get("cf-cache-status"),
+        "via": "scrapfly",
+        "cost": (payload.get("context") or {}).get("cost"),
+    }
+    return html, cache
+
+
 def fetch_html(url: str) -> tuple[str, dict]:
     """HTMLとキャッシュ指標を返す。
 
@@ -121,6 +174,14 @@ def fetch_html(url: str) -> tuple[str, dict]:
     elif enc == "deflate":
         raw = zlib.decompress(raw)
     return raw.decode("utf-8", errors="replace"), cache
+
+
+def _age_sec(cache: dict) -> int:
+    """Ageヘッダを秒で返す。取れない場合は「非常に古い」扱いにして比較から外す。"""
+    try:
+        return int(cache.get("age") or 0)
+    except (TypeError, ValueError):
+        return 10 ** 9
 
 
 def record_freshness(cache: dict) -> None:
@@ -452,10 +513,24 @@ def run_once(cfg: dict, dry_run: bool) -> None:
         current: dict[str, dict] = {}
         total_listed = 0
         last_cache: dict = {}
+        # 複数のカテゴリページを見る。各ページのCDNキャッシュは独立に期限切れするため、
+        # 同じ商品を含むページを複数見ると「どれかが先に更新される」＝実効遅延が縮む。
+        # 在庫は和集合で判定する（どこかに載っていれば購入可能）。
+        use_paid = cfg.get("scrapfly", {}).get("enabled") and _in_paid_window(cfg)
         for url in cfg["category_urls"]:
-            html, cache = fetch_html(url)
-            record_freshness(cache)
-            last_cache = cache
+            if use_paid:
+                try:
+                    html, cache = fetch_via_scrapfly(cfg, url)
+                except Exception as se:
+                    # 有料経路が落ちても監視は止めない。無料のキャッシュ経路に退避する。
+                    log(f"scrapfly failed, falling back to direct: {se}")
+                    html, cache = fetch_html(url)
+            else:
+                html, cache = fetch_html(url)
+            record_freshness({**cache, "url": url})
+            # 最も新しい（age最小の）ページを鮮度の代表値とする
+            if not last_cache or _age_sec(cache) < _age_sec(last_cache):
+                last_cache = cache
             items = parse_products(html)
             total_listed += len(items)
             for item in items:
@@ -616,6 +691,57 @@ def freshness_report() -> None:
         print("  → もう少し観測を続けてください")
 
 
+def scrapfly_proof(cfg: dict) -> None:
+    """課金前の実証: 有料経路が本当に「キャッシュを外した新鮮なデータ」を返すか確かめる。
+
+    無料経路と有料経路を同じURLに対して撃ち、age と last-modified を比べる。
+    有料経路が BYPASS/MISS かつ age が小さければ、鮮度改善は本物。
+    """
+    url = cfg["category_urls"][0]
+    print("=== 有料経路の実証（課金前の確認） ===\n")
+
+    html_a, cache_a = fetch_html(url)
+    n_a = len(parse_products(html_a))
+    print("【無料経路（CDNキャッシュ）】")
+    print(f"  cache={cache_a.get('cf_cache_status')} age={cache_a.get('age')}秒 "
+          f"({int(cache_a.get('age') or 0)//60}分古い)")
+    print(f"  last-modified={cache_a.get('last_modified')}  商品数={n_a}\n")
+
+    sf = dict(cfg.get("scrapfly", {}))
+    sf["enabled"] = True
+    probe_cfg = {**cfg, "scrapfly": sf}
+    try:
+        html_b, cache_b = fetch_via_scrapfly(probe_cfg, url)
+    except Exception as e:
+        print(f"【有料経路】失敗: {e}")
+        print("\n→ APIキーを .env の SCRAPFLY_API_KEY に設定してから再実行してください")
+        return
+
+    try:
+        n_b = len(parse_products(html_b))
+    except BlockedError as e:
+        print(f"【有料経路】ブロックされました: {e}")
+        print("\n→ 鮮度改善は見込めない。課金しないこと")
+        return
+
+    age_b = int(cache_b.get("age") or 0)
+    print("【有料経路（ScrapFly・キャッシュバスター付き）】")
+    print(f"  cache={cache_b.get('cf_cache_status')} age={age_b}秒 ({age_b//60}分古い)")
+    print(f"  last-modified={cache_b.get('last_modified')}  商品数={n_b}")
+    print(f"  消費クレジット={cache_b.get('cost')}\n")
+
+    print("■ 判定")
+    improve = int(cache_a.get("age") or 0) - age_b
+    if n_b == 0:
+        print("  ❌ 商品が取れていない → 課金しない")
+    elif age_b <= 300:
+        print(f"  ✅ ほぼリアルタイム（{age_b//60}分）。無料経路より {improve//60}分 新しい → 課金する価値あり")
+    elif improve > 600:
+        print(f"  🟡 {improve//60}分 改善。効果はあるが完全なリアルタイムではない")
+    else:
+        print(f"  ❌ 改善 {improve//60}分 のみ＝同じキャッシュを見ている → 課金しても無駄")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--once", action="store_true", help="1回だけ実行（launchd用）")
@@ -623,6 +749,8 @@ def main() -> None:
     ap.add_argument("--no-jitter", action="store_true", help="開始時のランダム待機をしない")
     ap.add_argument("--test-email", action="store_true", help="テストメールを送って終了")
     ap.add_argument("--test-line", action="store_true", help="テストLINEを送って終了")
+    ap.add_argument("--test-scrapfly", action="store_true",
+                    help="有料経路が本当に鮮度を上げるか検証（課金前の実証用）")
     ap.add_argument("--freshness-report", action="store_true",
                     help="キャッシュ鮮度の実測結果を集計して表示")
     args = ap.parse_args()
@@ -631,6 +759,10 @@ def main() -> None:
 
     if args.freshness_report:
         freshness_report()
+        return
+
+    if args.test_scrapfly:
+        scrapfly_proof(cfg)
         return
 
     if args.test_email:

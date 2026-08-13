@@ -44,7 +44,8 @@
     "ルージュ・アッシュ"
   ],
   "category_urls": [
-    "https://www.hermes.com/jp/ja/category/leather-goods/bags-and-clutches/womens-bags-and-clutches/"
+    "https://www.hermes.com/jp/ja/category/leather-goods/bags-and-clutches/womens-bags-and-clutches/",
+    "https://www.hermes.com/jp/ja/category/leather-goods/bags-and-clutches/"
   ],
   "base_url": "https://www.hermes.com/jp/ja",
   "_privacy_note": "宛先・送信元アドレスはこのファイルに書かない（公開リポジトリのため）。環境変数か .env を使う。",
@@ -65,5 +66,28 @@
   },
   "jitter_seconds": 45,
   "notify_sold_out": false,
-  "failure_alert_after": 12
+  "failure_alert_after": 12,
+  "_freshness_note": "複数ページを見るのはCDNキャッシュの期限が独立しているため。どれかが先に更新される分だけ実効遅延が縮む。全件掲載(total<=items)のページのみ追加してよい",
+  "scrapfly": {
+    "_note": "有料経路。キャッシュを外して鮮度を上げる。キーは .env / GH Secrets の SCRAPFLY_API_KEY",
+    "_cost": "asp+住宅IPで約25-30クレジット/回。$30プラン=20万クレジット/月。hours_jstで課金時間帯を絞る",
+    "enabled": false,
+    "api_key_env": "SCRAPFLY_API_KEY",
+    "asp": true,
+    "country": "jp",
+    "render_js": false,
+    "cache_bust": true,
+    "timeout": 90,
+    "hours_jst": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ]
+  }
 }

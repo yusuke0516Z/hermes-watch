@@ -45,6 +45,8 @@ jobs:
           HERMES_RECIPIENT: ${{ secrets.HERMES_RECIPIENT }}
           HERMES_FAILURE_ALERT_TO: ${{ secrets.HERMES_FAILURE_ALERT_TO }}
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+          # 有料経路（任意）。未設定なら config.scrapfly.enabled=false のまま無料経路で動く
+          SCRAPFLY_API_KEY: ${{ secrets.SCRAPFLY_API_KEY }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           if [ "$DRY_RUN" = "true" ]; then
