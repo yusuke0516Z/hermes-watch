@@ -104,7 +104,13 @@ python3 setup_richmenu.py --clean  # 全削除
 `assets/icon.png`（640×640）を用意してあるが、**プロフィール画像はAPIで設定できない**。
 manager.line.biz →「設定」→「アカウント設定」から手動でアップロードする。
 
-### 2. メール通知
+### 2. メール通知（任意）
+
+**LINEが主経路。メールは無くても動く。** 使わない場合は `config.json` の `smtp.enabled` を
+`false` のままにするか、`HERMES_SMTP_PASSWORD` を設定しなければ自動的にスキップされる。
+
+> 障害アラート（12回連続で取得失敗）は**LINEにも流れる**ので、メールを使わなくても
+> システムが止まったことに気づける。
 
 1. 送信元にするGmailで [アプリパスワード](https://myaccount.google.com/apppasswords) を発行
    （2段階認証が未設定なら先に[セキュリティ設定](https://myaccount.google.com/security)から有効化）
