@@ -43,30 +43,66 @@ Hermèsカテゴリページ（レディスバッグ）
 
 カテゴリページは Cloudflare CDN で **`max-age=3600`（最大1時間）キャッシュ**される。キャッシュを外す方法（URLにクエリ付与）は DataDome が即ブロックするため、**本物のブラウザでも新鮮なデータを取得できない**。
 
-つまり **検知の遅延はポーリング間隔ではなくHermès側のキャッシュで決まる**。実測では `age` が5〜28分程度だった。
+つまり **検知の遅延はポーリング間隔ではなくHermès側のキャッシュで決まる**。5分間隔にしても2分間隔にしても、エッジが同じキャッシュを返す限り差は出ない。
 
-実際の更新間隔は測定して確認できる：
+**23.3時間・99回の実測結果（2026-08-13）**：
+
+| 指標 | 実測値 |
+|---|---|
+| データの古さ（`age`） | 最小0分 / **中央31分** / 最大60分 |
+| オリジンの実更新間隔 | 最短29分 / **中央60分** / 最長146分 |
+
+→ **平均31分・最悪1時間遅れて気づく**ことになる。人気色が数分で消える場合は取り逃す。
+
+最新の実測は随時確認できる：
 
 ```bash
 python3 hermes_monitor.py --freshness-report
 ```
 
-これが遅すぎる場合は、住宅用プロキシ系のスクレイピングAPI（ScrapFly等・月$30〜）を挟む選択肢がある。
+これを詰めるには、住宅用プロキシ系のスクレイピングAPI（ScrapFly等・月$30〜）を挟む必要がある。**課金は実測を見てから判断する**方針（無料枠1000リクエストで効果検証してから）。
 
 ## セットアップ
 
 ### 1. LINE通知（推奨・移動中でも気づける）
 
-1. [LINE Developers](https://developers.line.biz/console/) にログイン
-2. 新規プロバイダー作成 → **Messaging API** チャネルを作成
-3. 「Messaging API設定」タブ → **チャネルアクセストークン（長期）** を発行してコピー
-4. 同じタブのQRコードから、通知を受け取る人が**Botを友だち追加**
-5. 「応答メッセージ」はオフにしておくと静か
+> ⚠️ **2024年9月に作成フローが変わった。** 古い記事の「LINE Developersで直接チャネル作成」は現在使えない。
+> 先に**LINE公式アカウント**を作り、そこからMessaging APIを有効化する。
+
+1. [LINE Official Account Manager](https://manager.line.biz/) にLINEアカウントでログイン → アカウントを作成
+2. 「設定」→「Messaging API」→ **「Messaging APIを利用する」** をクリック
+   （プロバイダー名は**後から変更できない**ので慎重に）
+3. [LINE Developers](https://developers.line.biz/console/) を開く → 該当チャネル → 「Messaging API設定」タブ
+   → 最下部の **チャネルアクセストークン（長期）** を発行してコピー（正本は1Passwordへ）
+4. manager.line.biz の「応答設定」で **応答メッセージ・あいさつメッセージをオフ**（静かにする）
+5. 通知を受け取る人が **Botを友だち追加**（`https://line.me/R/ti/p/@ベーシックID`）
+   **追加していない人には届かない**ので必須
 6. `.env` に設定し、`config.json` の `line.enabled` を `true` に：
-   ```
+
+   ```bash
    LINE_CHANNEL_TOKEN=発行したトークン
    ```
+
 7. テスト送信： `python3 hermes_monitor.py --test-line`
+
+#### リッチメニュー（トーク画面下部のメニュー）
+
+```bash
+python3 setup_richmenu.py          # 作成・画像アップロード・全員に適用
+python3 setup_richmenu.py --list   # 登録状況の確認
+python3 setup_richmenu.py --clean  # 全削除
+```
+
+画像は `assets/richmenu.html` を1250×843で撮影して `assets/richmenu.png`（2500×1686）にしたもの。
+デザインを変えたい時はHTMLを編集 → 同じサイズで撮り直し → `setup_richmenu.py` を再実行。
+
+> リンク先には **クエリ付きURL（`?facet_line=...` 等）を使わないこと。** DataDomeにブロックされ、
+> タップした人にキャプチャ画面が出る。プレーンなカテゴリURLのみ採用している。
+
+#### アカウントのプロフィール画像
+
+`assets/icon.png`（640×640）を用意してあるが、**プロフィール画像はAPIで設定できない**。
+manager.line.biz →「設定」→「アカウント設定」から手動でアップロードする。
 
 ### 2. メール通知
 
@@ -134,6 +170,9 @@ tail -20 logs/monitor.log
 |---|---|
 | `hermes_monitor.py` | 本体（取得・差分判定・通知） |
 | `config.json` | 監視モデル・優先カラー（**個人情報は書かない**） |
+| `setup_richmenu.py` | LINEリッチメニューの作成・適用 |
+| `assets/icon.html` / `icon.png` | アカウントアイコン（640×640・手動アップロード用） |
+| `assets/richmenu.html` / `richmenu.png` | リッチメニュー画像（2500×1686） |
 | `state/products.json` | 既知SKUと在庫状態。重複通知防止の要 |
 | `logs/freshness.jsonl` | キャッシュ鮮度の実測データ |
 | `.github/workflows/monitor.yml` | 24時間監視のスケジュール |

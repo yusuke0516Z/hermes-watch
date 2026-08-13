@@ -39,7 +39,11 @@ jobs:
 
       - name: Run monitor
         env:
+          # メールは4件そろって初めて送信できる（1件でも欠けると送信スキップ）
+          HERMES_SMTP_USER: ${{ secrets.HERMES_SMTP_USER }}
           HERMES_SMTP_PASSWORD: ${{ secrets.HERMES_SMTP_PASSWORD }}
+          HERMES_RECIPIENT: ${{ secrets.HERMES_RECIPIENT }}
+          HERMES_FAILURE_ALERT_TO: ${{ secrets.HERMES_FAILURE_ALERT_TO }}
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
