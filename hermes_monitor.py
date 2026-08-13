@@ -138,12 +138,13 @@ def fetch_via_scrapfly(cfg: dict, url: str) -> tuple[str, dict]:
     result = payload.get("result", {})
     html = result.get("content", "")
     headers = {k.lower(): v for k, v in (result.get("response_headers") or {}).items()}
+    cost = (payload.get("context") or {}).get("cost") or {}
     cache = {
         "age": headers.get("age"),
         "last_modified": headers.get("last-modified"),
         "cf_cache_status": headers.get("cf-cache-status"),
         "via": "scrapfly",
-        "cost": (payload.get("context") or {}).get("cost"),
+        "cost": cost.get("total") if isinstance(cost, dict) else cost,
     }
     return html, cache
 
@@ -197,21 +198,31 @@ class BlockedError(Exception):
 
 
 def parse_products(html: str) -> list[dict]:
-    """hermes-state JSON から商品一覧を取り出す。ブロック検知時は BlockedError。"""
-    if "captcha-delivery" in html or "Attention Required" in html:
-        raise BlockedError("bot-protection page returned (DataDome/Cloudflare)")
+    """hermes-state JSON から商品一覧を取り出す。取得できなければ BlockedError。
+
+    ブロック判定は「captcha-delivery という文字列があるか」ではなく
+    「商品データが取れたか」で行う。ScrapFly経由で正常に取得したページには
+    解決済みDataDomeのiframe要素が残っており、文字列で判定すると
+    データが取れているのにブロック扱いになる（2026-08-13に誤検知を確認）。
+    """
     m = re.search(
         r'<script id="hermes-state" type="application/json">(.*?)</script>', html, re.S
     )
-    if not m:
-        raise BlockedError("hermes-state not found in page")
-    st = json.loads(m.group(1))
-    for v in st.values():
-        if isinstance(v, dict) and isinstance(v.get("b"), dict):
-            products = (v["b"].get("products") or {}).get("items")
-            if products is not None:
-                return products
-    raise BlockedError("products node not found in hermes-state")
+    if m:
+        try:
+            st = json.loads(m.group(1))
+        except json.JSONDecodeError as e:
+            raise BlockedError(f"hermes-state のJSONが壊れている: {e}")
+        for v in st.values():
+            if isinstance(v, dict) and isinstance(v.get("b"), dict):
+                products = (v["b"].get("products") or {}).get("items")
+                if products is not None:
+                    return products
+
+    # ここに来た＝商品データが無い。理由を切り分けてから投げる。
+    if "captcha-delivery" in html or "Attention Required" in html:
+        raise BlockedError("bot-protection page returned (DataDome/Cloudflare)")
+    raise BlockedError("hermes-state / products が見つからない（サイト構造変更の可能性）")
 
 
 # ------------------------------------------------------------------- matching
@@ -517,7 +528,14 @@ def run_once(cfg: dict, dry_run: bool) -> None:
         # 同じ商品を含むページを複数見ると「どれかが先に更新される」＝実効遅延が縮む。
         # 在庫は和集合で判定する（どこかに載っていれば購入可能）。
         use_paid = cfg.get("scrapfly", {}).get("enabled") and _in_paid_window(cfg)
-        for url in cfg["category_urls"]:
+        urls = cfg["category_urls"]
+        if use_paid:
+            # 有料時は1回30クレジット。複数ページを叩くと費用が倍々になるので先頭だけに絞る。
+            # 先頭はレディスバッグ全件ページで、監視対象（Picotin/Constance/Lindy）は必ずここに載る。
+            # 無料経路の「複数ページでキャッシュのズレを稼ぐ」工夫は、
+            # キャッシュを外せる有料経路では不要（そもそもリアルタイムが取れる）。
+            urls = urls[:cfg["scrapfly"].get("url_limit", 1)]
+        for url in urls:
             if use_paid:
                 try:
                     html, cache = fetch_via_scrapfly(cfg, url)
