@@ -1,23 +1,22 @@
 # Hermès 在庫監視（24時間稼働の主基盤）
 #
-# 2026-08-12 実験で GitHub Actions の runner IP からカテゴリページを取得できることを確認済み
-# （3回連続で listed:16 / cache:HIT / ブロックなし）。Macのスリープに依存しない24h監視はここが担う。
+# 【ループ方式にした理由（2026-08-14）】
+#   当初は cron "*/5" で毎回起動していたが、GitHubは高頻度cronを混雑時に間引くため
+#   実測で45〜65分間隔まで劣化していた（$30のリアルタイム取得が台無しになる）。
+#   → cronは30分ごとの起動トリガーに格下げし、1回の起動で約28分ループして
+#     その中で監視を回す。これでcronが多少遅延・間引きされても監視間隔が保たれる。
 #
-# cron間隔の考え方（2026-08-13 更新・ScrapFly $30プラン契約後）:
-#   全実行が ScrapFly 経由（キャッシュバスターでCDNを外す）＝リアルタイムデータ。
-#   補充集中帯 JST 0〜8時（UTC 15〜23時）は5分、日中は15分。
-#   1回30クレジット × 168回/日 → 月約151,200 / 200,000（バッファ約4.4万）。
-#   間隔を詰める場合はこの試算を必ずやり直すこと（5分×24hは259,200で枠超過）。
-#   ScrapFly失敗・クレジット切れ時は無料キャッシュ経路へ自動フォールバック（LINEに1回警告）。
-#   ※GitHub側の混雑で cron は遅延することがある（数分〜十数分）。保証はされない。
+# 監視間隔（ループ内・JST基準）:
+#   0〜8時（補充集中帯）= 5分 ／ 9〜23時 = 15分
+#   クレジット試算: 168回/日 × 30 = 月約151,200 / 200,000（変更時は必ず再試算。5分×24hは枠超過）
+#   ScrapFly失敗・クレジット切れ時は無料キャッシュ経路へ自動フォールバック（LINEに1回警告）
+#
+# 実行時間の目安: 28分ループ × 48起動/日 ≈ 22.4h/日。public リポジトリはActions無料・無制限。
 name: hermes-monitor
 
 on:
   schedule:
-    # JST 0:00-8:55（UTC 15:00-23:55）: 補充集中帯を5分間隔
-    - cron: "*/5 15-23 * * *"
-    # JST 9:00-23:55（UTC 0:00-14:55）: 15分間隔
-    - cron: "*/15 0-14 * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -35,27 +34,41 @@ permissions:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Run monitor
+      - name: Monitor loop (~28 min)
         env:
-          # メールは4件そろって初めて送信できる（1件でも欠けると送信スキップ）
           HERMES_SMTP_USER: ${{ secrets.HERMES_SMTP_USER }}
           HERMES_SMTP_PASSWORD: ${{ secrets.HERMES_SMTP_PASSWORD }}
           HERMES_RECIPIENT: ${{ secrets.HERMES_RECIPIENT }}
           HERMES_FAILURE_ALERT_TO: ${{ secrets.HERMES_FAILURE_ALERT_TO }}
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-          # 有料経路（任意）。未設定なら config.scrapfly.enabled=false のまま無料経路で動く
           SCRAPFLY_API_KEY: ${{ secrets.SCRAPFLY_API_KEY }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          FLAGS="--once --no-jitter"
+          LOOP_BUDGET=1680   # 28分。cron間隔(30分)より短くして重複起動を避ける
           if [ "$DRY_RUN" = "true" ]; then
-            python3 hermes_monitor.py --once --no-jitter --dry-run
-          else
-            python3 hermes_monitor.py --once --no-jitter
+            FLAGS="$FLAGS --dry-run"
+            LOOP_BUDGET=0    # 手動テストは1回だけ実行して終了
           fi
+          while :; do
+            ITER_START=$SECONDS
+            python3 hermes_monitor.py $FLAGS || echo "::warning::monitor iteration failed (continuing)"
+            # JST時刻で間隔を決める（0-8時=300s / 9-23時=900s）
+            HOUR_JST=$(TZ=Asia/Tokyo date +%-H)
+            if [ "$HOUR_JST" -le 8 ]; then INTERVAL=300; else INTERVAL=900; fi
+            ELAPSED_ITER=$((SECONDS - ITER_START))
+            SLEEP=$((INTERVAL - ELAPSED_ITER))
+            # 予算を超える次イテレーションは始めない
+            if [ $((SECONDS + SLEEP + 60)) -ge $LOOP_BUDGET ]; then
+              echo "loop budget reached (${SECONDS}s) — exiting"
+              break
+            fi
+            [ $SLEEP -gt 0 ] && sleep $SLEEP
+          done
 
       - name: Persist state and freshness data
         if: always()
@@ -65,9 +78,16 @@ jobs:
           git add -f state/products.json logs/freshness.jsonl 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "no state change"
-          else
-            git commit -m "state: update [skip ci]"
-            # 他のrunと衝突したらリモートを取り込んでから再push
-            git pull --rebase --autostash origin main || true
-            git push origin main
+            exit 0
           fi
+          git commit -m "state: update [skip ci]"
+          # GitHub側の一時エラー(500等)や他runとの競合に備えて3回まで再試行
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin main || true
+            if git push origin main; then
+              exit 0
+            fi
+            echo "push failed (attempt $i) — retrying in $((i*10))s"
+            sleep $((i*10))
+          done
+          echo "::warning::state push failed after 3 attempts (次のrunが再検知するため監視自体は継続)"
