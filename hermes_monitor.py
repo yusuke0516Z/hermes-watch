@@ -30,6 +30,7 @@ import re
 import smtplib
 import sys
 import time
+import traceback
 import urllib.parse
 import urllib.request
 import zlib
@@ -191,6 +192,14 @@ def record_freshness(cache: dict) -> None:
     row = {"checked_at": datetime.now(JST).isoformat(), **cache}
     with open(FRESHNESS_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    # monitor.log と同様に上限を設ける。毎イテレーション追記され、gitにもコミットされるため
+    # 無制限だとリポジトリ履歴が際限なく肥大する。超過時は新しい半分だけ残す。
+    try:
+        if FRESHNESS_PATH.stat().st_size > 1_000_000:
+            lines = FRESHNESS_PATH.read_text(encoding="utf-8").splitlines(keepends=True)
+            FRESHNESS_PATH.write_text("".join(lines[len(lines) // 2:]), encoding="utf-8")
+    except OSError:
+        pass
 
 
 class BlockedError(Exception):
@@ -724,6 +733,51 @@ def freshness_report() -> None:
         print("  → もう少し観測を続けてください")
 
 
+def run_loop(cfg: dict) -> None:
+    """--loop: 1プロセスで予算時間だけ run_once を繰り返す（GitHub Actions用）。
+
+    背景: GitHubは高頻度cron（*/5等）を混雑時に間引くため、cron起動だけに頼ると
+    実測で45〜65分間隔まで劣化した（2026-08-14）。cronは約30分ごとの起動トリガーに
+    格下げし、監視間隔の管理はここで行う。
+
+    間隔・時間帯・予算の正本は config.json の "loop" セクション（workflowやREADMEに
+    数値を直書きしない）。クレジット試算もこの値から導出する。
+    """
+    lp = cfg.get("loop", {})
+    budget = lp.get("budget_seconds", 1680)
+    night_hours = set(lp.get("night_hours", [0, 1, 2, 3, 4, 5, 6, 7, 8]))
+    night_iv = lp.get("night_interval_sec", 300)
+    day_iv = lp.get("day_interval_sec", 900)
+    # 次のイテレーションを開始してよいかの安全マージン。
+    # 最悪ケース ＝ ScrapFlyタイムアウト ＋ 無料経路フォールバック・通知送信のぶん。
+    margin = cfg.get("scrapfly", {}).get("timeout", 90) + 90
+
+    start = time.monotonic()
+    total = failures = 0
+    while True:
+        iter_start = time.monotonic()
+        total += 1
+        try:
+            run_once(cfg, dry_run=False)
+        except Exception:
+            # BlockedError/OSError は run_once 内で処理済み。ここに来るのは想定外の
+            # バグ（構造変更・設定破損等）。ループは続けるが件数を数えておき、
+            # 全滅ならジョブを失敗させて外部（GitHubの失敗通知）に見えるようにする。
+            failures += 1
+            log(f"iteration crashed:\n{traceback.format_exc()}")
+
+        interval = night_iv if datetime.now(JST).hour in night_hours else day_iv
+        sleep_s = max(0, interval - (time.monotonic() - iter_start))
+        if time.monotonic() - start + sleep_s + margin >= budget:
+            break
+        time.sleep(sleep_s)
+
+    log(f"loop done: {total} iterations, {failures} crashed")
+    if total and failures == total:
+        # 1回も正常に動けなかった＝構造的な故障。exit 1 で run を赤くする
+        sys.exit(1)
+
+
 def scrapfly_proof(cfg: dict) -> None:
     """課金前の実証: 有料経路が本当に「キャッシュを外した新鮮なデータ」を返すか確かめる。
 
@@ -778,6 +832,8 @@ def scrapfly_proof(cfg: dict) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--once", action="store_true", help="1回だけ実行（launchd用）")
+    ap.add_argument("--loop", action="store_true",
+                    help="config.loop の設定に従い予算時間ぶんループ実行（GitHub Actions用）")
     ap.add_argument("--dry-run", action="store_true", help="メールを送らず内容をログに出す")
     ap.add_argument("--no-jitter", action="store_true", help="開始時のランダム待機をしない")
     ap.add_argument("--test-email", action="store_true", help="テストメールを送って終了")
@@ -808,6 +864,10 @@ def main() -> None:
         send_line(cfg, [{"type": "text",
                          "text": f"✅ Hermès Watch テスト通知\n{datetime.now(JST).strftime('%Y/%m/%d %H:%M')} JST"}])
         print("test LINE broadcast sent")
+        return
+
+    if args.loop:
+        run_loop(cfg)
         return
 
     if not args.no_jitter and not args.dry_run:

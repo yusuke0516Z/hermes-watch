@@ -2,25 +2,22 @@
 #
 # 【ループ方式にした理由（2026-08-14）】
 #   当初は cron "*/5" で毎回起動していたが、GitHubは高頻度cronを混雑時に間引くため
-#   実測で45〜65分間隔まで劣化していた（$30のリアルタイム取得が台無しになる）。
-#   → cronは30分ごとの起動トリガーに格下げし、1回の起動で約28分ループして
-#     その中で監視を回す。これでcronが多少遅延・間引きされても監視間隔が保たれる。
+#   実測で45〜65分間隔まで劣化していた。cronは約30分ごとの起動トリガーに格下げし、
+#   1回の起動で hermes_monitor.py --loop が予算時間ぶん監視を繰り返す。
 #
-# 監視間隔（ループ内・JST基準）:
-#   0〜8時（補充集中帯）= 5分 ／ 9〜23時 = 15分
-#   クレジット試算: 168回/日 × 30 = 月約151,200 / 200,000（変更時は必ず再試算。5分×24hは枠超過）
-#   ScrapFly失敗・クレジット切れ時は無料キャッシュ経路へ自動フォールバック（LINEに1回警告）
-#
-# 実行時間の目安: 28分ループ × 48起動/日 ≈ 22.4h/日。public リポジトリはActions無料・無制限。
+# 監視間隔・時間帯・予算・クレジット試算の正本は config.json の "loop" セクション。
+# このファイルには数値を書かない（分散させない）。
+# ScrapFly失敗・クレジット切れ時は無料キャッシュ経路へ自動フォールバック（LINEに1回警告）。
 name: hermes-monitor
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    # :00/:30 はGitHubの混雑ピークで間引かれやすい（公式も正時を避けるよう推奨）ため外す
+    - cron: "13,43 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "通知を送らず動作確認だけする"
+        description: "通知を送らず1回だけ動作確認する"
         type: boolean
         default: false
 
@@ -38,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Monitor loop (~28 min)
+      - name: Monitor
         env:
           HERMES_SMTP_USER: ${{ secrets.HERMES_SMTP_USER }}
           HERMES_SMTP_PASSWORD: ${{ secrets.HERMES_SMTP_PASSWORD }}
@@ -46,29 +43,14 @@ jobs:
           HERMES_FAILURE_ALERT_TO: ${{ secrets.HERMES_FAILURE_ALERT_TO }}
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
           SCRAPFLY_API_KEY: ${{ secrets.SCRAPFLY_API_KEY }}
-          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          FLAGS="--once --no-jitter"
-          LOOP_BUDGET=1680   # 28分。cron間隔(30分)より短くして重複起動を避ける
-          if [ "$DRY_RUN" = "true" ]; then
-            FLAGS="$FLAGS --dry-run"
-            LOOP_BUDGET=0    # 手動テストは1回だけ実行して終了
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 hermes_monitor.py --once --no-jitter --dry-run
+          else
+            # ループ内の想定外クラッシュは Python 側で数え、全滅時のみ exit 1 で
+            # このジョブを失敗させる（GitHubの失敗通知が飛ぶ）。部分的な失敗では止めない。
+            python3 hermes_monitor.py --loop
           fi
-          while :; do
-            ITER_START=$SECONDS
-            python3 hermes_monitor.py $FLAGS || echo "::warning::monitor iteration failed (continuing)"
-            # JST時刻で間隔を決める（0-8時=300s / 9-23時=900s）
-            HOUR_JST=$(TZ=Asia/Tokyo date +%-H)
-            if [ "$HOUR_JST" -le 8 ]; then INTERVAL=300; else INTERVAL=900; fi
-            ELAPSED_ITER=$((SECONDS - ITER_START))
-            SLEEP=$((INTERVAL - ELAPSED_ITER))
-            # 予算を超える次イテレーションは始めない
-            if [ $((SECONDS + SLEEP + 60)) -ge $LOOP_BUDGET ]; then
-              echo "loop budget reached (${SECONDS}s) — exiting"
-              break
-            fi
-            [ $SLEEP -gt 0 ] && sleep $SLEEP
-          done
 
       - name: Persist state and freshness data
         if: always()
@@ -81,8 +63,10 @@ jobs:
             exit 0
           fi
           git commit -m "state: update [skip ci]"
-          # GitHub側の一時エラー(500等)や他runとの競合に備えて3回まで再試行
+          # 一時エラー(500等)・他runとの競合に備えて3回まで再試行。
+          # 前回試行が rebase の途中で死んでいると以後全て失敗するため、毎回まず後始末する。
           for i in 1 2 3; do
+            git rebase --abort 2>/dev/null || true
             git pull --rebase --autostash origin main || true
             if git push origin main; then
               exit 0
@@ -90,4 +74,7 @@ jobs:
             echo "push failed (attempt $i) — retrying in $((i*10))s"
             sleep $((i*10))
           done
-          echo "::warning::state push failed after 3 attempts (次のrunが再検知するため監視自体は継続)"
+          # stateが保存できていない＝次runで同じイベントを再検知し重複通知が起きうる。
+          # 無音で流さず、ジョブを失敗させて気づけるようにする（監視自体は次のcronで再開する）
+          echo "::error::state push failed after 3 attempts"
+          exit 1

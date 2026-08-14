@@ -70,7 +70,7 @@
   "_freshness_note": "複数ページを見るのはCDNキャッシュの期限が独立しているため。どれかが先に更新される分だけ実効遅延が縮む。全件掲載(total<=items)のページのみ追加してよい",
   "scrapfly": {
     "_note": "有料経路。キャッシュを外して鮮度を上げる。キーは .env / GH Secrets の SCRAPFLY_API_KEY",
-    "_cost": "30クレジット/回。深夜0-8時5分＋日中15分の全実行を有料化=168回/日→月約151,200/20万（バッファ約4.4万）。$30プラン契約済み(2026-08-13)",
+    "_cost": "30クレジット/回（住宅25+JS描画5）。月間試算の正本は loop セクションの _cost_note",
     "enabled": true,
     "api_key_env": "SCRAPFLY_API_KEY",
     "asp": true,
@@ -105,5 +105,23 @@
       23
     ],
     "url_limit": 1
+  },
+  "loop": {
+    "_note": "GitHub Actionsの1起動あたりのループ設定の正本。workflowは --loop を呼ぶだけで数値を持たない",
+    "budget_seconds": 1680,
+    "night_hours": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "night_interval_sec": 300,
+    "day_interval_sec": 900,
+    "_cost_note": "クレジット試算はこの値から導出: 夜9h×12回＋昼15h×4回=168回/日×30cr≈月151,200/200,000。変更時は再試算"
   }
 }
