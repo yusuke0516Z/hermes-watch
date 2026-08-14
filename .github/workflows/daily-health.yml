@@ -1,0 +1,37 @@
+# 日次ヘルスチェック: 監視システム自体が健康かを毎晩LINEで報告する。
+# Macに依存しない（Secretsを持つActions上で完結）。チェック内容は healthcheck.py 参照。
+name: daily-health
+
+on:
+  schedule:
+    # JST 21:10（UTC 12:10）。混雑ピークの正時を避ける
+    - cron: "10 12 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "LINEに送らず出力だけ確認"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Health check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+          SCRAPFLY_API_KEY: ${{ secrets.SCRAPFLY_API_KEY }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 healthcheck.py --dry
+          else
+            python3 healthcheck.py
+          fi
