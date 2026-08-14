@@ -2,5 +2,6 @@
  "products": {},
  "failure_streak": 0,
  "failure_alerted": false,
- "initialized": true
+ "initialized": true,
+ "scrapfly_alerted": true
 }
