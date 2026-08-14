@@ -5,6 +5,18 @@
 #   実測で45〜65分間隔まで劣化していた。cronは約30分ごとの起動トリガーに格下げし、
 #   1回の起動で hermes_monitor.py --loop が予算時間ぶん監視を繰り返す。
 #
+# 【ループを長時間化した理由（2026-08-14 夕・日次点検）】
+#   28分ループにしても間隔劣化は解消しなかった（対策後の実測でも47〜116分間隔）。
+#   原因はGitHubのscheduleトリガー自体の遅延で、cron側の小細工では直せない。
+#   そこで「cronの正確さに依存しない」設計に変える:
+#     - ループ予算を170分に延長（config.json の loop.budget_seconds が正本）
+#     - cronは :13/:43 のまま高頻度に残す＝起動の取りこぼしに対する保険
+#     - 走行中に発火したcronは下の concurrency により pending で待機し、
+#       走行中のrunが終わった瞬間に起動する → 実質連続監視になり、
+#       cronが多少遅れても間引かれても監視の穴が生まれない
+#   これで取得回数は実測32回/日（設計の19%）から設計値168回/日に戻る。
+#   クレジットは月約28,200→151,200（枠200,000内・設計どおりの消費）。
+#
 # 監視間隔・時間帯・予算・クレジット試算の正本は config.json の "loop" セクション。
 # このファイルには数値を書かない（分散させない）。
 # ScrapFly失敗・クレジット切れ時は無料キャッシュ経路へ自動フォールバック（LINEに1回警告）。
@@ -21,6 +33,9 @@ on:
         type: boolean
         default: false
 
+# 連続監視の要。cancel-in-progress: false により、走行中に発火したcronは
+# キャンセルされずpendingで待ち、走行中のrunが終わり次第すぐ起動する。
+# runが異常終了した場合も次のcron（最大30分後）が拾うので自己修復する。
 concurrency:
   group: hermes-monitor
   cancel-in-progress: false
@@ -31,7 +46,9 @@ permissions:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    # config.json の loop.budget_seconds(170分) + checkout/state push のぶん。
+    # GitHubのジョブ上限は6時間なので、予算を伸ばす時もここが先に効くようにしておく。
+    timeout-minutes: 185
     steps:
       - uses: actions/checkout@v5
 
