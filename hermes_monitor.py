@@ -548,17 +548,24 @@ def run_once(cfg: dict, dry_run: bool) -> None:
             if use_paid:
                 try:
                     html, cache = fetch_via_scrapfly(cfg, url)
-                    if state.pop("scrapfly_alerted", None):
-                        log("scrapfly recovered")
+                    if state.get("scrapfly_fail_streak"):
+                        log(f"scrapfly recovered after {state['scrapfly_fail_streak']} failures")
+                    state["scrapfly_fail_streak"] = 0
+                    state.pop("scrapfly_alerted", None)
                 except Exception as se:
                     # 有料経路が落ちても監視は止めない。無料のキャッシュ経路に退避する。
-                    # ただし退避したことは1回だけLINEで知らせる（クレジット枯渇に気づけるように）。
-                    log(f"scrapfly failed, falling back to direct: {se}")
-                    if not state.get("scrapfly_alerted") and not dry_run:
+                    streak = state.get("scrapfly_fail_streak", 0) + 1
+                    state["scrapfly_fail_streak"] = streak
+                    log(f"scrapfly failed ({streak}回連続), falling back to direct: {se}")
+                    # 一時的なタイムアウト1回でLINEを鳴らさない（深夜3時に家族へ⚠️が
+                    # 飛んだ実績あり・2026-08-15）。3回連続＝クレジット切れ等の持続的
+                    # 障害と判断した時だけ、1度警告する。
+                    if streak >= 3 and not state.get("scrapfly_alerted") and not dry_run:
                         try:
                             send_line_text(
                                 cfg,
-                                "⚠️ Hermès Watch: 有料経路(ScrapFly)が失敗し、無料経路に切り替えました。\n"
+                                "⚠️ Hermès Watch: 有料経路(ScrapFly)が3回連続で失敗し、"
+                                "無料経路に切り替えています。\n"
                                 "クレジット切れの可能性があります。監視は続いていますが、"
                                 "検知が最大1時間ほど遅くなります。\n\n"
                                 f"エラー: {se}",

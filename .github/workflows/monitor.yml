@@ -24,8 +24,12 @@ name: hermes-monitor
 
 on:
   schedule:
-    # :00/:30 はGitHubの混雑ピークで間引かれやすい（公式も正時を避けるよう推奨）ため外す
-    - cron: "13,43 * * * *"
+    # :00/:30 はGitHubの混雑ピークで間引かれやすい（公式も正時を避けるよう推奨）ため外す。
+    # 毎時1回で足りる理由（2026-08-15）: ランが約170分走り続けるため、走行中に発火した
+    # cronが常に1本pendingで控えており、run終了と同時に次が始まる（連続監視）。
+    # 30分ごとに戻すとpendingの置き換えでcancelled表示が1日約48件出て、
+    # 異常が起きた時に本物の失敗がノイズに埋もれる。
+    - cron: "13 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -72,19 +76,27 @@ jobs:
       - name: Persist state and freshness data
         if: always()
         run: |
+          # 【マージ方式にした理由（2026-08-15）】
+          # 170分走る間にリモートへ別コミットが入ると、freshness.jsonl の追記同士が
+          # git rebase では解決不能な競合になり、旧実装の pull --rebase リトライは
+          # 3回とも同じ理由で失敗していた（2026-08-14に2件の実失敗）。
+          # → gitのテキストマージに頼らず、毎試行「最新のリモートに勝ち乗せ」する:
+          #   自分の結果を退避 → reset --hard origin/main → merge_state.py で意味的に統合。
+          # これならどんな競合・レースでも再試行のたびに解消される。
           git config user.name "hermes-monitor[bot]"
           git config user.email "hermes-monitor@users.noreply.github.com"
-          git add -f state/products.json logs/freshness.jsonl 2>/dev/null || true
-          if git diff --cached --quiet; then
-            echo "no state change"
-            exit 0
-          fi
-          git commit -m "state: update [skip ci]"
-          # 一時エラー(500等)・他runとの競合に備えて3回まで再試行。
-          # 前回試行が rebase の途中で死んでいると以後全て失敗するため、毎回まず後始末する。
+          cp state/products.json /tmp/ours_state.json 2>/dev/null || true
+          cp logs/freshness.jsonl /tmp/ours_fresh.jsonl 2>/dev/null || true
           for i in 1 2 3; do
-            git rebase --abort 2>/dev/null || true
-            git pull --rebase --autostash origin main || true
+            git fetch origin main
+            git reset --hard origin/main
+            python3 merge_state.py /tmp/ours_state.json /tmp/ours_fresh.jsonl
+            git add -f state/products.json logs/freshness.jsonl
+            if git diff --cached --quiet; then
+              echo "no state change"
+              exit 0
+            fi
+            git commit -m "state: update [skip ci]"
             if git push origin main; then
               exit 0
             fi
