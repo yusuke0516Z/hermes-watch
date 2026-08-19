@@ -1,45 +1,18 @@
 {
  "products": {
-  "H056289CKU4": {
-   "sku": "H056289CKU4",
+  "H056289CKX3": {
+   "sku": "H056289CKX3",
    "model": "Picotin",
    "title": "バッグ 《ピコタン・ロック》 18",
-   "color": "グリーン",
+   "color": "パープル",
    "size": "-",
    "price": 578600,
-   "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%94%E3%82%B3%E3%82%BF%E3%83%B3%E3%83%BB%E3%83%AD%E3%83%83%E3%82%AF%E3%80%8B-18-H056289CKU4/",
-   "image": "https://assets.hermes.com/is/image/hermesproduct/056289CKU4_front_1?size=600,600&extend=300,300,300,300&align=0,0",
+   "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%94%E3%82%B3%E3%82%BF%E3%83%B3%E3%83%BB%E3%83%AD%E3%83%83%E3%82%AF%E3%80%8B-18-H056289CKX3/",
+   "image": "https://assets.hermes.com/is/image/hermesproduct/056289CKX3_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
    "in_stock": false,
-   "first_seen": "2026-08-15T12:01:44.606873+09:00",
-   "last_seen": "2026-08-15T12:01:44.606873+09:00"
-  },
-  "H083189CCBH": {
-   "sku": "H083189CCBH",
-   "model": "Picotin",
-   "title": "バッグ 《ピコタン・ロック》 18 ポケット",
-   "color": "ベージュ/ナチュラル",
-   "size": "-",
-   "price": 704000,
-   "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%94%E3%82%B3%E3%82%BF%E3%83%B3%E3%83%BB%E3%83%AD%E3%83%83%E3%82%AF%E3%80%8B-18-%E3%83%9D%E3%82%B1%E3%83%83%E3%83%88-H083189CCBH/",
-   "image": "https://assets.hermes.com/is/image/hermesproduct/083189CCBH_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
-   "in_stock": false,
-   "first_seen": "2026-08-18T10:04:37.635344+09:00",
-   "last_seen": "2026-08-18T10:04:37.635344+09:00",
-   "sold_out_at": "2026-08-18T10:19:37.635475+09:00"
-  },
-  "H083189CKAA": {
-   "sku": "H083189CKAA",
-   "model": "Picotin",
-   "title": "バッグ 《ピコタン・ロック》 18 ポケット",
-   "color": "ブラック",
-   "size": "-",
-   "price": 704000,
-   "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%94%E3%82%B3%E3%82%BF%E3%83%B3%E3%83%BB%E3%83%AD%E3%83%83%E3%82%AF%E3%80%8B-18-%E3%83%9D%E3%82%B1%E3%83%83%E3%83%88-H083189CKAA/",
-   "image": "https://assets.hermes.com/is/image/hermesproduct/083189CKAA_worn_1?size=600,600&extend=0,0,0,0&align=0,0",
-   "in_stock": false,
-   "first_seen": "2026-08-18T11:19:37.635971+09:00",
-   "last_seen": "2026-08-18T11:19:37.635971+09:00",
-   "sold_out_at": "2026-08-18T11:34:37.636126+09:00"
+   "first_seen": "2026-08-19T16:06:39.880491+09:00",
+   "last_seen": "2026-08-19T16:06:39.880491+09:00",
+   "sold_out_at": "2026-08-19T16:21:39.880676+09:00"
   }
  },
  "failure_streak": 0,
