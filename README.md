@@ -203,13 +203,22 @@ python3 hermes_monitor.py --freshness-report
 tail -20 logs/monitor.log
 ```
 
-### ローカルでも動かす場合（任意）
+### ローカルのlaunchd（2026-08-23に停止・原則ロードしない）
 
-`com.tatsumi.hermes-bag-alert.plist` を `~/Library/LaunchAgents/` に置いて `launchctl load` すると5分間隔で動く。
-ただし **Macがスリープすると止まる**ため、24時間監視はGitHub Actions側が担う。
+`com.tatsumi.hermes-bag-alert.plist` を `~/Library/LaunchAgents/` に置いて `launchctl load` すると5分間隔で動くが、
+**GitHub Actionsと二重稼働になるため通常はロードしない**。2026-08-23に `launchctl unload -w` で永続無効化した
+（`-w` 付きなので再ログインでも復活しない）。
 
-両方動かすと同じ入荷で**通知が最大2通**届く（それぞれ独立にstateを持つため）。
-不要なら `launchctl unload ~/Library/LaunchAgents/com.tatsumi.hermes-bag-alert.plist` で止める。
+止めた理由（すべて実測）:
+
+- **同じ商品で奥様に2通届いていた。** 8/23は ローカル18:49「Lindy 新カラー」／CI 19:04「Lindy 再入荷！」。
+  stateを別々に持つのでイベント種別まで食い違う（README冒頭の設計どおり「最大2通」が実際に起きていた）
+- **ScrapFlyクレジットが枠を超えていた。** 8/16〜8/23のローカル実行は1,068回 ≒ 32,040クレジット（当月消費74,288の約4割）。
+  healthcheckの月末着地予測は 225,250 / 200,000 で超過見込みだった
+- Macがスリープすると止まるので、そもそも24時間監視の担い手にはならない
+
+再開する場合は `launchctl load -w ~/Library/LaunchAgents/com.tatsumi.hermes-bag-alert.plist`。
+その際は**クレジット試算とLINE重複を必ず再検討する**こと。
 
 ## 障害時の動き
 
