@@ -8,7 +8,7 @@ GitHub Actions で **24時間**動く（深夜は5分・日中は15分間隔。�
 
 ## 何を監視しているか
 
-`config.json` の `watch_models` で指定したモデル。既定は **Picotin / Constance / Lindy**。
+`config.json` の `watch_models` で指定したモデル。現在は **Picotin / Constance / Lindy / Garden Party**（2026-08-16 ガーデンパーティ追加）。
 
 追加はキーワードを1行足すだけ：
 
