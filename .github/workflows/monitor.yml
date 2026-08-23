@@ -56,6 +56,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # 監視キーワードが公式商品名に一致しない設定を、本番実行の前に落とす。
+      # 2026-08-23: ガーデンパーティを中黒なしの「ガーデンパーティ」で登録したため
+      # 公式名「バッグ 《ガーデン・パーティ》 36」に一致せず監視ゼロ。しかもログは
+      # matched:0 で「在庫なし」と見分けがつかず、気づける手段が無かった。
+      - name: Config self-test
+        run: python3 hermes_monitor.py --self-test
+
       - name: Monitor
         env:
           HERMES_SMTP_USER: ${{ secrets.HERMES_SMTP_USER }}

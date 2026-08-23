@@ -236,17 +236,103 @@ def parse_products(html: str) -> list[dict]:
 
 # ------------------------------------------------------------------- matching
 
+# 【表記ゆれを吸収する理由（2026-08-23）】
+# 日本公式の商品名は「バッグ 《ガーデン・パーティ》 36」のように中黒で区切られ、
+# slug も url もパーセントエンコードされた日本語（英語スラッグではない）。つまり
+#   - 英語キーワード（"garden party" 等）はどこにも一致しない＝実質デッドコード
+#   - 中黒の有無ひとつでキーワードが素通りする
+# 実際に「ガーデンパーティ」（中黒なし）を登録して監視ゼロになり、しかもログ上は
+# matched:0 = 在庫なしと見分けがつかず気づけなかった。照合前に表記ゆれだけを潰す。
+_NOISE_RE = re.compile(r"[・･\s\u3000\-‐‑–—ー]")
+
+
+def _norm(s: str) -> str:
+    """中黒・空白・ハイフン・長音符を除去して小文字化する（表記ゆれの吸収）。"""
+    return _NOISE_RE.sub("", s.lower())
+
+
+def _norm_fields(*vals: str) -> str:
+    """複数フィールドを正規化して連結する。
+    空白を消すので、区切り "|" を残さないと title の末尾と slug の先頭が
+    つながって偽の一致が生まれる。"""
+    return "|".join(_norm(v or "") for v in vals)
+
+
 def match_model(cfg: dict, item: dict) -> str | None:
-    text = f"{item.get('title','')} {item.get('slug','')} {item.get('url','')}".lower()
+    text = _norm_fields(item.get("title", ""), item.get("slug", ""), item.get("url", ""))
     for w in cfg["watch_models"]:
-        if any(k.lower() in text for k in w["keywords"]):
+        if any(_norm(k) in text for k in w["keywords"]):
             return w["model"]
     return None
 
 
 def is_priority_color(cfg: dict, rec: dict) -> bool:
-    text = f"{rec.get('title','')} {rec.get('color','')} {rec.get('url','')}".lower()
-    return any(c.lower() in text for c in cfg["priority_colors"])
+    text = _norm_fields(rec.get("title", ""), rec.get("color", ""), rec.get("url", ""))
+    return any(_norm(c) in text for c in cfg["priority_colors"])
+
+
+# --self-test のフィクスチャ。すべて hermes.com/jp/ja に実在した公式商品名。
+# 【監視モデルを追加したら、公式サイトの商品名をそのまま1件ここにも足すこと】
+# これが無いと「キーワードが一致しないだけ」と「本当に在庫が無い」を区別できない。
+SELF_TEST_FIXTURES = {
+    "Picotin": "バッグ 《ピコタン・ロック》 18 ポケット",
+    "Constance": "ウォレットバッグ 《コンスタンス》 トゥー・ゴー",
+    "Lindy": "バッグ 《リンディII》 ミニ",
+    "Garden Party": "バッグ 《ガーデン・パーティ》 36",
+}
+
+# 監視対象でない商品を誤って拾っていないか（過剰一致の検出）
+SELF_TEST_NEGATIVES = [
+    "バッグ 《ソー・メドール》",
+    "バッグ 《ボリード1923》 45 カザック",
+    "バッグ 《エトリヴィエール・ショッピング》",
+]
+
+
+def self_test(cfg: dict) -> None:
+    """config のキーワードが実在の公式商品名に本当に一致するかを通信なしで検証する。
+
+    2026-08-23 の事故の再発防止。「ガーデンパーティ」を中黒なしで登録したため
+    公式名「バッグ 《ガーデン・パーティ》 36」に一致せず、監視されていないのに
+    ログ上は matched:0（＝在庫なしと同じ見た目）で気づけなかった。
+    """
+    def as_item(title: str) -> dict:
+        return {"title": title, "slug": title.replace(" ", "-"), "url": ""}
+
+    ng, unverified = [], []
+    print("watch_models の照合テスト:")
+    for w in cfg["watch_models"]:
+        model = w["model"]
+        fixture = SELF_TEST_FIXTURES.get(model)
+        if not fixture:
+            unverified.append(model)
+            continue
+        hit = match_model(cfg, as_item(fixture))
+        ok = hit == model
+        print(f"  [{'OK' if ok else 'NG'}] {model:<13} <- {fixture}"
+              + ("" if ok else f"   ← 実際の判定: {hit}"))
+        if not ok:
+            ng.append(model)
+
+    print("過剰一致テスト（拾ってはいけない商品）:")
+    for title in SELF_TEST_NEGATIVES:
+        hit = match_model(cfg, as_item(title))
+        print(f"  [{'OK' if hit is None else 'NG'}] {title}"
+              + ("" if hit is None else f"   ← {hit} として誤検知"))
+        if hit is not None:
+            ng.append(f"過剰一致:{title}")
+
+    for m in unverified:
+        print(f"  [WARN] {m:<13} フィクスチャ未登録＝検証できない。"
+              "SELF_TEST_FIXTURES に公式商品名を1件追加すること")
+
+    if ng:
+        print(f"\n❌ 失敗 {len(ng)}件: {', '.join(ng)}")
+        print("   一致しないモデルは在庫が出ても通知されない。"
+              "config.json のキーワードを公式サイトの表記どおりに直すこと")
+        sys.exit(1)
+    print(f"\n✅ watch_models {len(cfg['watch_models'])}件すべて公式商品名に一致"
+          + (f"（未検証 {len(unverified)}件）" if unverified else ""))
 
 
 def to_record(cfg: dict, item: dict, model: str, now: str) -> dict:
@@ -621,7 +707,8 @@ def run_once(cfg: dict, dry_run: bool) -> None:
                         log(f"failure alert mail failed: {me}")
                 # 通知できなかった場合はフラグを立てない＝次回も再通知を試みる
                 state["failure_alerted"] = alerted
-        save_state(state)
+        if not dry_run:
+            save_state(state)
         return
 
     if state.get("failure_streak"):
@@ -679,6 +766,14 @@ def run_once(cfg: dict, dry_run: bool) -> None:
                 return
         for ev in events:
             log(f"  event: {ev['type']} {ev['rec']['sku']} {ev['rec']['title']}")
+
+    # 【dry-run では state を保存しない（2026-08-23）】
+    # 以前は if/else の外にあったため --dry-run でも state が前進していた。
+    # ローカル検証のつもりで走らせた結果を誤ってcommitすると、CIが「通知済み」と
+    # 誤認して本物の再入荷を奥様に通知しなくなる。dry-run は副作用ゼロを保証する。
+    if dry_run:
+        log("[DRY-RUN] state は保存しない")
+        return
 
     save_state(state)
 
@@ -849,9 +944,15 @@ def main() -> None:
                     help="有料経路が本当に鮮度を上げるか検証（課金前の実証用）")
     ap.add_argument("--freshness-report", action="store_true",
                     help="キャッシュ鮮度の実測結果を集計して表示")
+    ap.add_argument("--self-test", action="store_true",
+                    help="監視キーワードが公式商品名に一致するか検証（通信なし・CIで実行）")
     args = ap.parse_args()
 
     cfg = load_config()
+
+    if args.self_test:
+        self_test(cfg)
+        return
 
     if args.freshness_report:
         freshness_report()
