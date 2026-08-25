@@ -24,8 +24,9 @@
    "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%AA%E3%83%B3%E3%83%87%E3%82%A3ii%E3%80%8B-%E3%83%9F%E3%83%8B-H087946CKAF/",
    "image": "https://assets.hermes.com/is/image/hermesproduct/087946CKAF_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
    "in_stock": false,
-   "first_seen": "2026-08-20T19:50:36.471684+09:00",
-   "last_seen": "2026-08-20T19:50:36.471684+09:00"
+   "first_seen": "2026-08-25T09:48:53.282417+09:00",
+   "last_seen": "2026-08-25T09:48:53.282417+09:00",
+   "sold_out_at": "2026-08-25T10:03:53.282535+09:00"
   },
   "H085959CK89": {
    "sku": "H085959CK89",
@@ -51,9 +52,9 @@
    "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%AA%E3%83%B3%E3%83%87%E3%82%A3ii%E3%80%8B-%E3%83%9F%E3%83%8B-H087946CKAA/",
    "image": "https://assets.hermes.com/is/image/hermesproduct/087946CKAA_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
    "in_stock": false,
-   "first_seen": "2026-08-24T10:00:22.722454+09:00",
-   "last_seen": "2026-08-24T10:00:22.722454+09:00",
-   "sold_out_at": "2026-08-24T10:15:22.722592+09:00"
+   "first_seen": "2026-08-23T19:03:24.062753+09:00",
+   "last_seen": "2026-08-23T19:03:24.062753+09:00",
+   "sold_out_at": "2026-08-23T19:18:24.062880+09:00"
   },
   "H087946CKAG": {
    "sku": "H087946CKAG",
@@ -65,36 +66,9 @@
    "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%AA%E3%83%B3%E3%83%87%E3%82%A3ii%E3%80%8B-%E3%83%9F%E3%83%8B-H087946CKAG/",
    "image": "https://assets.hermes.com/is/image/hermesproduct/087946CKAG_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
    "in_stock": false,
-   "first_seen": "2026-08-25T13:34:17.399000+09:00",
-   "last_seen": "2026-08-25T13:34:17.399000+09:00",
-   "sold_out_at": "2026-08-25T13:49:17.399135+09:00"
-  },
-  "H088632CK34": {
-   "sku": "H088632CK34",
-   "model": "Lindy",
-   "title": "バッグ 《リンディII》 ミニ",
-   "color": "ベージュ/ナチュラル",
-   "size": "-",
-   "price": 1474000,
-   "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%AA%E3%83%B3%E3%83%87%E3%82%A3ii%E3%80%8B-%E3%83%9F%E3%83%8B-H088632CK34/",
-   "image": "https://assets.hermes.com/is/image/hermesproduct/088632CK34_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
-   "in_stock": false,
-   "first_seen": "2026-08-25T18:35:09.966295+09:00",
-   "last_seen": "2026-08-25T18:35:09.966295+09:00",
-   "sold_out_at": "2026-08-25T18:50:09.966432+09:00"
-  },
-  "H056289CC55": {
-   "sku": "H056289CC55",
-   "model": "Picotin",
-   "title": "バッグ 《ピコタン・ロック》 18",
-   "color": "レッド",
-   "size": "-",
-   "price": 578600,
-   "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%94%E3%82%B3%E3%82%BF%E3%83%B3%E3%83%BB%E3%83%AD%E3%83%83%E3%82%AF%E3%80%8B-18-H056289CC55/",
-   "image": "https://assets.hermes.com/is/image/hermesproduct/056289CC55_worn_1?size=600,600&extend=0,0,0,0&align=0,0",
-   "in_stock": false,
-   "first_seen": "2026-08-25T19:20:09.966707+09:00",
-   "last_seen": "2026-08-25T19:20:09.966707+09:00"
+   "first_seen": "2026-08-25T09:48:53.282417+09:00",
+   "last_seen": "2026-08-25T09:48:53.282417+09:00",
+   "sold_out_at": "2026-08-25T10:03:53.282535+09:00"
   }
  },
  "failure_streak": 0,
