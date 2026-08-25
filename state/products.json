@@ -24,8 +24,9 @@
    "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%AA%E3%83%B3%E3%83%87%E3%82%A3ii%E3%80%8B-%E3%83%9F%E3%83%8B-H087946CKAF/",
    "image": "https://assets.hermes.com/is/image/hermesproduct/087946CKAF_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
    "in_stock": false,
-   "first_seen": "2026-08-20T19:50:36.471684+09:00",
-   "last_seen": "2026-08-20T19:50:36.471684+09:00"
+   "first_seen": "2026-08-25T09:48:53.282417+09:00",
+   "last_seen": "2026-08-25T09:48:53.282417+09:00",
+   "sold_out_at": "2026-08-25T10:03:53.282535+09:00"
   },
   "H085959CK89": {
    "sku": "H085959CK89",
@@ -51,9 +52,23 @@
    "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%AA%E3%83%B3%E3%83%87%E3%82%A3ii%E3%80%8B-%E3%83%9F%E3%83%8B-H087946CKAA/",
    "image": "https://assets.hermes.com/is/image/hermesproduct/087946CKAA_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
    "in_stock": false,
-   "first_seen": "2026-08-24T10:00:22.722454+09:00",
-   "last_seen": "2026-08-24T10:00:22.722454+09:00",
-   "sold_out_at": "2026-08-24T10:15:22.722592+09:00"
+   "first_seen": "2026-08-23T19:03:24.062753+09:00",
+   "last_seen": "2026-08-23T19:03:24.062753+09:00",
+   "sold_out_at": "2026-08-23T19:18:24.062880+09:00"
+  },
+  "H087946CKAG": {
+   "sku": "H087946CKAG",
+   "model": "Lindy",
+   "title": "バッグ 《リンディII》 ミニ",
+   "color": "ベージュ/ナチュラル",
+   "size": "-",
+   "price": 1452000,
+   "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%AA%E3%83%B3%E3%83%87%E3%82%A3ii%E3%80%8B-%E3%83%9F%E3%83%8B-H087946CKAG/",
+   "image": "https://assets.hermes.com/is/image/hermesproduct/087946CKAG_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
+   "in_stock": false,
+   "first_seen": "2026-08-25T09:48:53.282417+09:00",
+   "last_seen": "2026-08-25T09:48:53.282417+09:00",
+   "sold_out_at": "2026-08-25T10:03:53.282535+09:00"
   }
  },
  "failure_streak": 0,
