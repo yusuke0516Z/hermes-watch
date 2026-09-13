@@ -80,8 +80,8 @@
    "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%82%AC%E3%83%BC%E3%83%87%E3%83%B3%E3%83%BB%E3%83%91%E3%83%BC%E3%83%86%E3%82%A3%E3%80%8B-36-H087096CKAA/",
    "image": "https://assets.hermes.com/is/image/hermesproduct/087096CKAA_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
    "in_stock": false,
-   "first_seen": "2026-08-26T13:50:12.426056+09:00",
-   "last_seen": "2026-08-26T13:50:12.426056+09:00",
+   "first_seen": "2026-09-13T17:19:47.336427+09:00",
+   "last_seen": "2026-09-13T17:19:47.336427+09:00",
    "sold_out_at": "2026-08-26T14:05:12.426190+09:00"
   },
   "H088632CK34": {
@@ -176,6 +176,19 @@
    "in_stock": false,
    "first_seen": "2026-09-12T16:42:56.436246+09:00",
    "last_seen": "2026-09-12T16:42:56.436246+09:00"
+  },
+  "H056289CCP0": {
+   "sku": "H056289CCP0",
+   "model": "Picotin",
+   "title": "バッグ 《ピコタン・ロック》 18",
+   "color": "グレー",
+   "size": "-",
+   "price": 578600,
+   "url": "https://www.hermes.com/jp/ja/product/%E3%83%90%E3%83%83%E3%82%B0-%E3%80%8A%E3%83%94%E3%82%B3%E3%82%BF%E3%83%B3%E3%83%BB%E3%83%AD%E3%83%83%E3%82%AF%E3%80%8B-18-H056289CCP0/",
+   "image": "https://assets.hermes.com/is/image/hermesproduct/056289CCP0_front_wm_1?size=600,600&extend=0,0,0,0&align=0,0",
+   "in_stock": false,
+   "first_seen": "2026-09-13T17:19:47.336427+09:00",
+   "last_seen": "2026-09-13T17:19:47.336427+09:00"
   }
  },
  "failure_streak": 0,
