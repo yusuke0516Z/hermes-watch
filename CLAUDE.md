@@ -7,7 +7,7 @@
 
 - Hermès日本公式の在庫を24時間監視し、新商品・再入荷・価格変更をLINE通知（奥様＋辰巳さん）
 - 実行基盤は **GitHub Actions**（repo: `yusuke0516Z/hermes-watch`・public）。Macは不要。ローカルは開発・点検のみ
-- 毎時cron → `hermes_monitor.py --loop` が170分走行（JST 0-8時=5分間隔／日中=15分間隔。正本は `config.json` の `loop`）
+- 毎時cron → `hermes_monitor.py --loop` が170分走行（JST 9-18時=5分間隔／それ以外=15分間隔。正本は `config.json` の `loop`）
 - 取得は ScrapFly 有料経路（キャッシュバスターでリアルタイム・30クレジット/回・月枠200,000）。失敗時は無料キャッシュ経路へ自動フォールバック
 - 自己運用: 日次ヘルスLINE（`daily-health.yml`・21:10 JST）＋ クラウド自動点検ルーチン（`trig_01NaHsrQ9Z2fPhYpSKbmoRAv`・21:30 JST・異常時のみ自己修正コミット）
 

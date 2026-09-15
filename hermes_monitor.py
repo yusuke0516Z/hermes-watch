@@ -224,8 +224,16 @@ def parse_products(html: str) -> list[dict]:
             raise BlockedError(f"hermes-state のJSONが壊れている: {e}")
         for v in st.values():
             if isinstance(v, dict) and isinstance(v.get("b"), dict):
-                products = (v["b"].get("products") or {}).get("items")
+                pc = v["b"].get("products") or {}
+                products = pc.get("items")
                 if products is not None:
+                    # maxSize はページが持つ総件数（実測: レディース31=31、バッグ全体47=47）。
+                    # items より大きければ1ページに収まっておらず、載っていない商品を見逃す。
+                    try:
+                        if int(pc.get("maxSize", 0)) > len(products):
+                            log(f"WARN: 一覧が全件掲載でない可能性 maxSize={pc.get('maxSize')} items={len(products)}")
+                    except (TypeError, ValueError):
+                        pass
                     return products
 
     # ここに来た＝商品データが無い。理由を切り分けてから投げる。
@@ -628,7 +636,8 @@ def run_once(cfg: dict, dry_run: bool) -> None:
         urls = cfg["category_urls"]
         if use_paid:
             # 有料時は1回30クレジット。複数ページを叩くと費用が倍々になるので先頭だけに絞る。
-            # 先頭はレディスバッグ全件ページで、監視対象（Picotin/Constance/Lindy）は必ずここに載る。
+            # 先頭は「バッグ全体」ページ（2026-09-15にレディースから変更。レディースの完全上位集合で
+            # 1ページ完結・費用同じ。メンズ寄りに分類されうるネオ・ガーデンを取りこぼさないため）。
             # 無料経路の「複数ページでキャッシュのズレを稼ぐ」工夫は、
             # キャッシュを外せる有料経路では不要（そもそもリアルタイムが取れる）。
             urls = urls[:cfg["scrapfly"].get("url_limit", 1)]
@@ -849,9 +858,10 @@ def run_loop(cfg: dict) -> None:
     """
     lp = cfg.get("loop", {})
     budget = lp.get("budget_seconds", 1680)
-    night_hours = set(lp.get("night_hours", [0, 1, 2, 3, 4, 5, 6, 7, 8]))
-    night_iv = lp.get("night_interval_sec", 300)
-    day_iv = lp.get("day_interval_sec", 900)
+    # 2026-09-15: 「深夜=密／日中=疎」から「入荷が起きる日中=密」へ。理由は config.loop._schedule_note
+    fast_hours = set(lp.get("fast_hours", range(9, 19)))
+    fast_iv = lp.get("fast_interval_sec", 300)
+    slow_iv = lp.get("slow_interval_sec", 900)
     # 次のイテレーションを開始してよいかの安全マージン。
     # 最悪ケース ＝ ScrapFlyタイムアウト ＋ 無料経路フォールバック・通知送信のぶん。
     margin = cfg.get("scrapfly", {}).get("timeout", 90) + 90
@@ -870,7 +880,7 @@ def run_loop(cfg: dict) -> None:
             failures += 1
             log(f"iteration crashed:\n{traceback.format_exc()}")
 
-        interval = night_iv if datetime.now(JST).hour in night_hours else day_iv
+        interval = fast_iv if datetime.now(JST).hour in fast_hours else slow_iv
         sleep_s = max(0, interval - (time.monotonic() - iter_start))
         if time.monotonic() - start + sleep_s + margin >= budget:
             break

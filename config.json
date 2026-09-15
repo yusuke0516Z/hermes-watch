@@ -62,8 +62,8 @@
     "ルージュ・アッシュ"
   ],
   "category_urls": [
-    "https://www.hermes.com/jp/ja/category/leather-goods/bags-and-clutches/womens-bags-and-clutches/",
-    "https://www.hermes.com/jp/ja/category/leather-goods/bags-and-clutches/"
+    "https://www.hermes.com/jp/ja/category/leather-goods/bags-and-clutches/",
+    "https://www.hermes.com/jp/ja/category/leather-goods/bags-and-clutches/womens-bags-and-clutches/"
   ],
   "base_url": "https://www.hermes.com/jp/ja",
   "_privacy_note": "宛先・送信元アドレスはこのファイルに書かない（公開リポジトリのため）。環境変数か .env を使う。",
@@ -128,19 +128,22 @@
     "_note": "GitHub Actionsの1起動あたりのループ設定の正本。workflowは --loop を呼ぶだけで数値を持たない",
     "_budget_note": "170分。cronの遅延・間引きに強くするための値（2026-08-14）。28分にしていた頃は昼間15.8分しかカバーできず、cron遅延(実測47〜116分)と合わせて設計の19%しか監視できていなかった。走行中に発火したcronはconcurrencyでpending待機し、run終了と同時に起動するため実質連続監視になる。6時間のジョブ上限に対し余裕を残しつつ、ランナー障害時に失うstateを3時間以内に抑える値。workflowのtimeout-minutesはこの値+15分に合わせること",
     "budget_seconds": 10200,
-    "night_hours": [
-      0,
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8
+    "_schedule_note": "2026-09-15 実測に基づく再配分（辰巳さん承認）: 9/4〜9/15のCIログで入荷イベント9件はすべて10〜17時JST、0〜8時は5分間隔で1,400回以上見て0件。旧設定（0-8時=5分/日中=15分）は予算の向きが逆だった。fast_hours の時間帯は fast_interval_sec、それ以外は slow_interval_sec で回る。変更時は _cost_note を再試算",
+    "fast_hours": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
     ],
-    "night_interval_sec": 300,
-    "day_interval_sec": 900,
-    "_cost_note": "クレジット試算はこの値から導出: 夜9h×12回＋昼15h×4回=168回/日×30cr≈月151,200/200,000。変更時は再試算。なおbudget_seconds=1680だった頃の実消費は月約28,200（設計の19%）で、枠を大幅に使い残していた。170分化で設計値に到達する見込み"
-  }
+    "fast_interval_sec": 300,
+    "slow_interval_sec": 900,
+    "_cost_note": "クレジット試算はこの値から導出: 日中10h×12回＋その他14h×4回=176回/日×30cr≈月158,400/200,000。変更時は再試算。1回30クレジットは固定（2026-09-15実測: データセンターIPでもASPが住宅IPに昇格し同額・ASPなしは403）"
+  },
+  "_category_urls_note": "先頭が有料経路の取得対象（url_limit=1）。2026-09-15にレディース→バッグ全体へ変更: バッグ全体はレディースの完全上位集合（実測47件⊇31件・maxSize=items で1ページ完結）で費用は同じ30クレジット。メンズ寄りに分類されうるネオ・ガーデンを取りこぼさないため。通知対象は watch_models のみで変わらない"
 }
