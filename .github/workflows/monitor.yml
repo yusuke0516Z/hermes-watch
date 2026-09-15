@@ -17,6 +17,15 @@
 #   これで取得回数は実測32回/日（設計の19%）から設計値168回/日に戻る。
 #   クレジットは月約28,200→151,200（枠200,000内・設計どおりの消費）。
 #
+# 【自己連鎖にした理由（2026-09-15）】
+#   上の「走行中に発火したcronがpendingで控える」前提は、GitHubのcronが走行中に
+#   1回も発火しないと崩れる。実測で直近7日の稼働は74%、穴30件・最大218分
+#   （9/14 22:18→9/15 01:56、深夜の高頻度帯にかかった）。自動点検ルーチンが
+#   8/27から20日連続で記録していたが、設計変更は点検の権限外で放置されていた。
+#   → ランの最後に次のランを自分で起動する（末尾の Chain next run）。
+#     cronは連鎖が切れた時の保険として残す。GITHUB_TOKEN からの workflow_dispatch は
+#     新しいランを作れる（GitHub公式ドキュメントで確認済みの例外）。
+#
 # 監視間隔・時間帯・予算・クレジット試算の正本は config.json の "loop" セクション。
 # このファイルには数値を書かない（分散させない）。
 # ScrapFly失敗・クレジット切れ時は無料キャッシュ経路へ自動フォールバック（LINEに1回警告）。
@@ -46,6 +55,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write   # Chain next run で次のランを起動するため
 
 jobs:
   monitor:
@@ -64,6 +74,7 @@ jobs:
         run: python3 hermes_monitor.py --self-test
 
       - name: Monitor
+        id: monitor
         env:
           HERMES_SMTP_USER: ${{ secrets.HERMES_SMTP_USER }}
           HERMES_SMTP_PASSWORD: ${{ secrets.HERMES_SMTP_PASSWORD }}
@@ -72,6 +83,7 @@ jobs:
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
           SCRAPFLY_API_KEY: ${{ secrets.SCRAPFLY_API_KEY }}
         run: |
+          echo "LOOP_STARTED=$(date +%s)" >> "$GITHUB_ENV"
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             python3 hermes_monitor.py --once --no-jitter --dry-run
           else
@@ -114,3 +126,28 @@ jobs:
           # 無音で流さず、ジョブを失敗させて気づけるようにする（監視自体は次のcronで再開する）
           echo "::error::state push failed after 3 attempts"
           exit 1
+
+      # 次のランを自分で起動する（2026-09-15・理由は冒頭コメント）。
+      # 起動しない条件＝暴走とノイズの防止:
+      #   - キャンセル・失敗・dry-run のラン（Monitor が success のときだけ連鎖）
+      #   - 30分未満で終わったラン（即終了→即起動の無限ループを防ぐ。cronが拾う）
+      #   - すでに待機中のランがある（cronのpendingが引き継ぐ。二重起動でcancelled表示を増やさない）
+      # state保存に失敗しても連鎖は止めない。監視の継続を優先し、失敗はジョブの赤で知らせる。
+      - name: Chain next run
+        if: ${{ !cancelled() && steps.monitor.outcome == 'success' && inputs.dry_run != true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          elapsed=$(( $(date +%s) - ${LOOP_STARTED:-$(date +%s)} ))
+          if [ "$elapsed" -lt 1800 ]; then
+            echo "::warning::ループが${elapsed}秒で終了したため次のランを起動しない（暴走防止）。次のcronが拾う"
+            exit 0
+          fi
+          waiting=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow monitor.yml --limit 20 --json status \
+            -q '[.[] | select(.status=="queued" or .status=="pending" or .status=="waiting" or .status=="requested")] | length')
+          if [ "${waiting:-0}" -gt 0 ]; then
+            echo "待機中のランが${waiting}件あるため起動しない（そちらが引き継ぐ）"
+            exit 0
+          fi
+          gh workflow run monitor.yml --repo "$GITHUB_REPOSITORY" --ref main
+          echo "次のランを起動した（ループ ${elapsed}秒で完走）"
