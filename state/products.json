@@ -191,7 +191,7 @@
    "last_seen": "2026-09-13T17:19:47.336427+09:00"
   }
  },
- "failure_streak": 0,
+ "failure_streak": 1,
  "failure_alerted": false,
  "initialized": true,
  "scrapfly_fail_streak": 0
