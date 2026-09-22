@@ -194,6 +194,5 @@
  "failure_streak": 0,
  "failure_alerted": false,
  "initialized": true,
- "scrapfly_fail_streak": 3,
- "scrapfly_alerted": true
+ "scrapfly_fail_streak": 0
 }
