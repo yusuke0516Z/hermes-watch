@@ -1,5 +1,7 @@
 # Hermès Bag Alert 👜
 
+> ⏸ **2026-09-25 停止中**（GitHub Actions無効化・ScrapFly解約）。再開手順: ①ScrapFly再契約→APIキーをGitHub Secrets SCRAPFLY_API_KEYと.envに更新 ②gh workflow enable monitor.yml / daily-health.yml --repo yusuke0516Z/hermes-watch ③必要なら点検ルーチン trig_01NaHsrQ9Z2fPhYpSKbmoRAv を enabled:true に
+
 Hermès日本公式オンラインショップのバッグ在庫を監視し、**新商品・再入荷・新カラー・新サイズ・価格変更**を検知してLINEとメールで通知するツール。
 
 GitHub Actions で **24時間**動く（9〜19時は5分・それ以外は15分間隔。正本は `config.json` の `loop`。2026-09-15に実測で入荷が日中に集中していたため深夜密→日中密へ再配分）。個人の在庫確認を自動化する目的で、リクエストは1回につきカテゴリページ1枚のみ。
